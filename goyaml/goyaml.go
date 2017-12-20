@@ -29,6 +29,11 @@ func GoYAMLGeneration(packageSource string, packageName string, ymlOutput string
 	var info *godoc.PageInfo
 	info = p.GetPkgPageInfo(abspath, relpath, mode)
 	// end of get package info
+
+	// Begin: get position
+	PrintPosition(info)
+	// End: get position
+
 	// to YAML struct
 	docPackage := ToDocfx(info)
 	// create YAML file
@@ -46,6 +51,47 @@ func GoYAMLGeneration(packageSource string, packageName string, ymlOutput string
 	yamlFile.Write(yamlBytes)
 	yamlFile.Close()
 	return nil
+}
+
+// PrintPosition
+// some Sample codes to print the source code position, for constants & functions & methods
+func PrintPosition(info *godoc.PageInfo){
+	// print position info for constant
+	fmt.Println("---Constant source info example--------------------")
+	if len(info.PDoc.Consts) > 0 {
+		constant := info.PDoc.Consts[0] // use the first one for example
+		position := constant.Decl.Pos()
+		fs := info.FSet.Position(position)
+		fmt.Println(constant.Names)
+		fmt.Println(fs.Filename, fs.Line)
+	}
+	fmt.Println("---Function source info example--------------------")
+	// print position info for function
+	if len(info.PDoc.Funcs) > 0 {
+		function := info.PDoc.Funcs[0]
+		position := function.Decl.Pos()
+		fs := info.FSet.Position(position)
+		fmt.Println(function.Name)
+		fmt.Println(fs.Filename, fs.Line)
+	}
+	fmt.Println("---Type source info example--------------------")
+	// print position info for type
+	if len(info.PDoc.Types) > 0 {
+		typea := info.PDoc.Types[0]
+		position := typea.Decl.Pos()
+		fs := info.FSet.Position(position)
+		fmt.Println(typea.Name)
+		fmt.Println(fs.Filename, fs.Line)
+		if len(typea.Methods) > 0 {
+			fmt.Println("---Method source info example--------------------")
+			methoda := typea.Methods[0]
+			position := methoda.Decl.Pos()
+			fs := info.FSet.Position(position)
+			fmt.Println(methoda.Name)
+			fmt.Println(fs.Filename, fs.Line)
+		}
+	}
+	fmt.Println("-----------------------")
 }
 
 
@@ -119,11 +165,17 @@ type DocsExample struct {
 	Code string `json:"code"`
 }
 
+type SourcePosition struct {
+	File	string	`json:"file"`
+	Line	int		`json:"line"`
+}
+
 type DocsValue struct {
 	Names       []string `json:"names"`
 	Summary     string   `json:"summary"`
 	Description string   `json:"description"`
 	Code        string   `json:"code"`
+	Source		SourcePosition	`json:"source"`
 }
 
 type DocsType struct {
@@ -136,6 +188,7 @@ type DocsType struct {
 	Vars    []DocsValue `json:"vars"`
 	Funcs   []DocsFunc  `json:"funcs"`
 	Methods []DocsFunc  `json:"methods"`
+	Source		SourcePosition	`json:"source"`
 }
 
 type DocsFunc struct {
@@ -143,6 +196,7 @@ type DocsFunc struct {
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
 	Code        string `json:"code"`
+	Source		SourcePosition	`json:"source"`
 }
 
 func ToDocfx(info *godoc.PageInfo) *DocsPackage {
@@ -185,6 +239,8 @@ func toDocsDirs(dirs *godoc.DirList) []DocsDir {
 func toDocsTypes(types []*doc.Type, info *godoc.PageInfo) []DocsType {
 	arr := make([]DocsType, len(types))
 	for i, t := range types {
+		position := t.Decl.Pos()
+		fs := info.FSet.Position(position)
 		arr[i] = DocsType{
 			Name:        t.Name,
 			Summary:     summary(t.Doc),
@@ -194,6 +250,7 @@ func toDocsTypes(types []*doc.Type, info *godoc.PageInfo) []DocsType {
 			Vars:        toDocsValues(t.Vars, info),
 			Funcs:       toDocsFuncs(t.Funcs, info),
 			Methods:     toDocsFuncs(t.Methods, info),
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
@@ -202,11 +259,14 @@ func toDocsTypes(types []*doc.Type, info *godoc.PageInfo) []DocsType {
 func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo) []DocsFunc {
 	arr := make([]DocsFunc, len(funcs))
 	for i, f := range funcs {
+		position := f.Decl.Pos()
+		fs := info.FSet.Position(position)
 		arr[i] = DocsFunc{
 			Name:        f.Name,
 			Summary:     summary(f.Doc),
 			Description: description(f.Doc),
 			Code:        nodeFunc(info, f.Decl),
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
@@ -215,11 +275,14 @@ func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo) []DocsFunc {
 func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
 	arr := make([]DocsValue, len(values))
 	for i, v := range values {
+		position := v.Decl.Pos()
+		fs := info.FSet.Position(position)
 		arr[i] = DocsValue{
 			Names:       v.Names,
 			Summary:     summary(v.Doc),
 			Description: description(v.Doc),
 			Code:        nodeFunc(info, v.Decl),
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr

@@ -1,7 +1,7 @@
 package main
 
 import (
-"./goyaml"
+	"./goyaml"
 )
 
 func main() {
@@ -11,7 +11,7 @@ func main() {
 	// arg2 package name
 	packageName := "github"
 	// arg3 output directory, wher package.yml saved to
-	ymlOutput := "D:/Bunny/Work"
+	ymlOutput := "C:/Users/chungao/GolandProjects/GoYAML/result/"
 	goyaml.GoYAMLGeneration(packageSource, packageName, ymlOutput)
 }
 
