@@ -31,7 +31,7 @@ func GoYAMLGeneration(packageSource string, packageName string, ymlOutput string
 	// end of get package info
 
 	// Begin: get position
-	PrintPosition(info)
+	// PrintPosition(info) - only for test purpose
 	// End: get position
 
 	// to YAML struct
