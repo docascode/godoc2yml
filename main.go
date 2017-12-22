@@ -2,7 +2,7 @@ package main
 
 import (
     "os"
-	"./goyaml"
+    "./goyaml"
 )
 
 func main() {
