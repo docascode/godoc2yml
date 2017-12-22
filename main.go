@@ -1,17 +1,18 @@
 package main
 
 import (
+    "os"
 	"./goyaml"
 )
 
 func main() {
 	// parameters
 	// arg1 directory which contains the package,
-	packageSource := "D:/Bunny/Work/GitRepo/golang-sampleprojects/go-github"
+	packageSource := os.Args[1]
 	// arg2 package name
-	packageName := "github"
+	packageName := os.Args[2]
 	// arg3 output directory, wher package.yml saved to
-	ymlOutput := "C:/Users/chungao/GolandProjects/GoYAML/result/"
+	ymlOutput := os.Args[3]
 	goyaml.GoYAMLGeneration(packageSource, packageName, ymlOutput)
 }
 
