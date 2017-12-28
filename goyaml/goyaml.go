@@ -7,7 +7,6 @@ import (
 	"go/build"
 	"go/doc"
 	"go/printer"
-	"log"
 	"os"
 	pathpkg "path"
 	"path/filepath"
@@ -128,16 +127,8 @@ const (
 )
 
 func nodeFunc(info *godoc.PageInfo, node interface{}) string {
-	/*
-		var buf bytes.Buffer
-		printer.Fprint(&buf, info.FSet, node)
-		return buf.String()
-	*/
 	var buf bytes.Buffer
-	err := printer.Fprint(&buf, info.FSet, node)
-	if err != nil {
-		log.Fatal(err)
-	}
+	printer.Fprint(&buf, info.FSet, node)
 	return buf.String()
 }
 
@@ -179,7 +170,7 @@ type SourcePosition struct {
 }
 
 type DocsValue struct {
-	Names       string         `json:"name"`
+	Name        string         `json:"name"`
 	Summary     string         `json:"summary"`
 	Description string         `json:"description"`
 	Code        string         `json:"code"`
@@ -281,57 +272,25 @@ func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo) []DocsFunc {
 }
 
 func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
-	/*
-		arr := make([]DocsValue, len(values))
-		for i, v := range values {
-			position := v.Decl.Pos()
-			fs := info.FSet.Position(position)
-			arr[i] = DocsValue{
-				Names:       v.Names,
-				Summary:     summary(v.Doc),
-				Description: description(v.Doc),
-				Code:        nodeFunc(info, v.Decl),
-				Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
-			}
-		}
-		return arr
-	*/
-	/*
-		arr := make([]DocsValue, 2)
-		v := values[0]
-		for i := 0; i < 2; i++ {
-			spec := v.Decl.Specs[i].(*ast.ValueSpec)
-			position := spec.Pos()
-			fs := info.FSet.Position(position)
-			newSpec := *spec
-			newSpec.Doc = nil
-			arr[i] = DocsValue{
-				Names:       v.Names[i],
-				Summary:     summary(spec.Doc.Text()),
-				Description: description(spec.Doc.Text()),
-				Code:        nodeFunc(info, &newSpec),
-				Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
-			}
-		}
-		return arr
-	*/
 	var arrs []DocsValue
 	for _, v := range values {
 		arr := make([]DocsValue, len(v.Names))
 		if len(v.Names) > 1 {
-			for j, n := range v.Names {
+			for j, name := range v.Names {
 				spec := v.Decl.Specs[j].(*ast.ValueSpec)
-				nullDocSpec := *spec
-				nullDocSpec.Doc = nil
+				doc := spec.Doc.Text()
+
+				// Ignore the document of declaration to get the Code section
+				spec.Doc = nil
 
 				position := spec.Pos()
 				fs := info.FSet.Position(position)
 
 				arr[j] = DocsValue{
-					Names:       n,
-					Summary:     summary(spec.Doc.Text()),
-					Description: description(spec.Doc.Text()),
-					Code:        nodeFunc(info, &nullDocSpec),
+					Name:        name,
+					Summary:     summary(doc),
+					Description: description(doc),
+					Code:        nodeFunc(info, spec),
 					Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
 				}
 			}
@@ -339,7 +298,7 @@ func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
 			position := v.Decl.Pos()
 			fs := info.FSet.Position(position)
 			arr[0] = DocsValue{
-				Names:       v.Names[0],
+				Name:        v.Names[0],
 				Summary:     summary(v.Doc),
 				Description: description(v.Doc),
 				Code:        nodeFunc(info, v.Decl),
@@ -350,7 +309,6 @@ func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
 		arrs = append(arrs, arr...)
 	}
 	return arrs
-
 }
 
 func toDocsExamples(examples []*doc.Example, info *godoc.PageInfo) []DocsExample {
