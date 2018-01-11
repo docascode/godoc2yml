@@ -1,13 +1,18 @@
 package main
 
 import (
-	"os"
-
-	"./goyaml"
+    "fmt"
+    "os"
+    "./goyaml"
 )
 
 func main() {
-	// parameters
+    if len(os.Args) != 5 {
+        fmt.Println("Usage: ./godoc2yml <package_source_path> <yaml_output_path> <package_prefix> <source_repo>")
+        os.Exit(-1)
+    }
+
+    // parameters
 	// arg1 source package path
 	packageSource := os.Args[1]
 	// arg2 output directory
