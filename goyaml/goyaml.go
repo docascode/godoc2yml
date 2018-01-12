@@ -2,38 +2,26 @@ package goyaml
 
 import (
 	"bytes"
-	"fmt"
 	"go/build"
 	"go/doc"
 	"go/printer"
-	"os"
-	pathpkg "path"
-	"path/filepath"
-	"strings"
-
 	"golang.org/x/tools/godoc"
 	"golang.org/x/tools/godoc/vfs"
 	"gopkg.in/yaml.v2"
+	"path/filepath"
+	pathpkg "path"
+	"os"
+	"fmt"
 )
 
-var SourceRepo string
-
 //  GoYAMLGeneration Generate the YAML file for golang projects
-func GoYAMLGeneration(packageSource string, ymlOutput string, packagePrefix string, sourceRepo string) error {
-	// Split package name from packageSource
-	packagePaths := strings.Split(packageSource, "/")
-	packageName := packagePaths[len(packagePaths)-1]
-	packagePaths = packagePaths[:len(packagePaths)-1]
-	packageSource = strings.Join(packagePaths, "/")
-	SourceRepo = sourceRepo
-
+func GoYAMLGeneration(packageSource string, packageName string, ymlOutput string) error {
 	// initialization
 	ns := vfs.NameSpace{}
 	ns.Bind("/", vfs.OS("C:/Go"), "/", vfs.BindReplace)
 	ns.Bind("/src", vfs.OS(packageSource), "/", vfs.BindAfter)
 	c := godoc.NewCorpus(ns)
 	p := godoc.NewPresentation(c)
-
 	// Begin of get package info
 	abspath, relpath := paths(ns, p, packageName)
 	var mode godoc.PageInfoMode
@@ -47,39 +35,18 @@ func GoYAMLGeneration(packageSource string, ymlOutput string, packagePrefix stri
 	// End: get position
 
 	// to YAML struct
-	docPackage, types := ToDocfx(info, packageName, packagePrefix)
-
-	// create package YAML file
-	packagePath := ymlOutput + "/" + packagePrefix
-	os.Mkdir(packagePath, os.ModePerm)
+	docPackage := ToDocfx(info)
+	// create YAML file
+	yamlFile, err := os.Create(ymlOutput + "/" + packageName + ".yml")
+	if err != nil {
+		fmt.Errorf("Failed to create file: ", packageName)
+		return nil
+	}
 	yamlBytes, err := yaml.Marshal(docPackage)
 	if err != nil {
 		fmt.Errorf("Failed to Marshal")
 		return err
 	}
-	PrintYaml(yamlBytes, packagePath, packageName)
-
-	// create type Yaml files
-	typePath := packagePath + "/" + packageName
-	os.Mkdir(typePath, os.ModePerm)
-	for _, t := range types {
-		yamlBytes, err = yaml.Marshal(t)
-		if err != nil {
-			fmt.Errorf("Failed to Marshal")
-			return err
-		}
-		PrintYaml(yamlBytes, typePath, t.Name)
-	}
-	return nil
-}
-
-func PrintYaml(yamlBytes []byte, outputPath string, fileName string) error {
-	yamlFile, err := os.Create(outputPath + "/" + fileName + ".yml")
-	if err != nil {
-		fmt.Errorf("Failed to create file: ", fileName)
-		return err
-	}
-
 	yamlFile.WriteString("#YamlMIME: GoLangPkg\n")
 	yamlFile.Write(yamlBytes)
 	yamlFile.Close()
@@ -88,7 +55,7 @@ func PrintYaml(yamlBytes []byte, outputPath string, fileName string) error {
 
 // PrintPosition
 // some Sample codes to print the source code position, for constants & functions & methods
-func PrintPosition(info *godoc.PageInfo) {
+func PrintPosition(info *godoc.PageInfo){
 	// print position info for constant
 	fmt.Println("---Constant source info example--------------------")
 	if len(info.PDoc.Consts) > 0 {
@@ -127,6 +94,7 @@ func PrintPosition(info *godoc.PageInfo) {
 	fmt.Println("-----------------------")
 }
 
+
 // paths determines the paths to use.
 //
 // If we are passed an operating system path like . or ./foo or /foo/bar or c:\mysrc,
@@ -163,16 +131,16 @@ func nodeFunc(info *godoc.PageInfo, node interface{}) string {
 	return buf.String()
 }
 
+
+
 type DocsPackage struct {
-	Uid         string                `json:"uid"`
-	Name        string                `json:"name"`
 	IsMain      bool                  `json:"ismain"`
 	Summary     string                `json:"summary"`
 	Description string                `json:"description"`
 	ImportPath  string                `json:"importPath"`
 	Dir         string                `json:"dir"`
 	Consts      []DocsValue           `json:"consts"`
-	Types       []string              `json:"types"`
+	Types       []DocsType            `json:"types"`
 	Vars        []DocsValue           `json:"vars"`
 	Funcs       []DocsFunc            `json:"funcs"`
 	Notes       map[string][]DocsNote `json:"notes"`
@@ -198,63 +166,57 @@ type DocsExample struct {
 }
 
 type SourcePosition struct {
-	Repo string `json:"repo"`
-	File string `json:"file"`
-	Line int    `json:"line"`
+	File	string	`json:"file"`
+	Line	int		`json:"line"`
 }
 
 type DocsValue struct {
-	Names       []string       `json:"names"`
-	Summary     string         `json:"summary"`
-	Description string         `json:"description"`
-	Code        string         `json:"code"`
-	Source      SourcePosition `json:"source"`
+	Names       []string `json:"names"`
+	Summary     string   `json:"summary"`
+	Description string   `json:"description"`
+	Code        string   `json:"code"`
+	Source		SourcePosition	`json:"source"`
 }
 
 type DocsType struct {
-	Uid         string `json:"uid"`
 	Name        string `json:"name"`
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
 	Code        string `json:"code"`
 
-	Consts  []DocsValue    `json:"consts"`
-	Vars    []DocsValue    `json:"vars"`
-	Funcs   []DocsFunc     `json:"funcs"`
-	Methods []DocsFunc     `json:"methods"`
-	Source  SourcePosition `json:"source"`
+	Consts  []DocsValue `json:"consts"`
+	Vars    []DocsValue `json:"vars"`
+	Funcs   []DocsFunc  `json:"funcs"`
+	Methods []DocsFunc  `json:"methods"`
+	Source		SourcePosition	`json:"source"`
 }
 
 type DocsFunc struct {
-	Uid         string         `json:"uid"`
-	Name        string         `json:"name"`
-	Summary     string         `json:"summary"`
-	Description string         `json:"description"`
-	Code        string         `json:"code"`
-	Source      SourcePosition `json:"source"`
+	Name        string `json:"name"`
+	Summary     string `json:"summary"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	Source		SourcePosition	`json:"source"`
 }
 
-func ToDocfx(info *godoc.PageInfo, packageName string, packagePrefix string) (*DocsPackage, []DocsType) {
+func ToDocfx(info *godoc.PageInfo) *DocsPackage {
 	pkg := &DocsPackage{
 		IsMain: info.IsMain,
 		Dir:    info.Dirname,
 		Notes:  toDocsNotes(info.Notes),
 		Dirs:   toDocsDirs(info.Dirs),
 	}
-	var types []DocsType
 	if info.PDoc != nil {
-		pkg.Uid = packagePrefix + "." + packageName
-		pkg.Name = packageName
 		pkg.ImportPath = info.PDoc.ImportPath
 		pkg.Summary = summary(info.PDoc.Doc)
 		pkg.Description = description(info.PDoc.Doc)
 		pkg.Examples = toDocsExamples(info.Examples, info)
 		pkg.Consts = toDocsValues(info.PDoc.Consts, info)
 		pkg.Vars = toDocsValues(info.PDoc.Vars, info)
-		pkg.Funcs = toDocsFuncs(info.PDoc.Funcs, info, pkg.Uid)
-		types, pkg.Types = toDocsTypes(info.PDoc.Types, info, pkg.Uid)
+		pkg.Funcs = toDocsFuncs(info.PDoc.Funcs, info)
+		pkg.Types = toDocsTypes(info.PDoc.Types, info)
 	}
-	return pkg, types
+	return pkg
 }
 
 func toDocsDirs(dirs *godoc.DirList) []DocsDir {
@@ -274,42 +236,37 @@ func toDocsDirs(dirs *godoc.DirList) []DocsDir {
 	return arr
 }
 
-func toDocsTypes(types []*doc.Type, info *godoc.PageInfo, parentUid string) ([]DocsType, []string) {
+func toDocsTypes(types []*doc.Type, info *godoc.PageInfo) []DocsType {
 	arr := make([]DocsType, len(types))
-	uidArr := make([]string, len(types))
 	for i, t := range types {
 		position := t.Decl.Pos()
 		fs := info.FSet.Position(position)
-		uid := parentUid + "." + t.Name
 		arr[i] = DocsType{
-			Uid:         uid,
 			Name:        t.Name,
 			Summary:     summary(t.Doc),
 			Description: description(t.Doc),
 			Code:        nodeFunc(info, t.Decl),
 			Consts:      toDocsValues(t.Consts, info),
 			Vars:        toDocsValues(t.Vars, info),
-			Funcs:       toDocsFuncs(t.Funcs, info, uid),
-			Methods:     toDocsFuncs(t.Methods, info, uid),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Funcs:       toDocsFuncs(t.Funcs, info),
+			Methods:     toDocsFuncs(t.Methods, info),
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
-		uidArr[i] = uid
 	}
-	return arr, uidArr
+	return arr
 }
 
-func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo, parentUid string) []DocsFunc {
+func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo) []DocsFunc {
 	arr := make([]DocsFunc, len(funcs))
 	for i, f := range funcs {
 		position := f.Decl.Pos()
 		fs := info.FSet.Position(position)
 		arr[i] = DocsFunc{
-			Uid:         parentUid + "." + f.Name,
 			Name:        f.Name,
 			Summary:     summary(f.Doc),
 			Description: description(f.Doc),
 			Code:        nodeFunc(info, f.Decl),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
@@ -325,7 +282,7 @@ func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
 			Summary:     summary(v.Doc),
 			Description: description(v.Doc),
 			Code:        nodeFunc(info, v.Decl),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
