@@ -17,15 +17,15 @@ import (
 )
 
 var SourceRepo string
+var SourceBranch string
 
 //  GoYAMLGeneration Generate the YAML file for golang projects
-func GoYAMLGeneration(packageSource string, ymlOutput string, packagePrefix string, sourceRepo string) error {
+func GoYAMLGeneration(packageSource string, ymlOutput string, packagePrefix string) error {
 	// Split package name from packageSource
 	packagePaths := strings.Split(packageSource, "/")
 	packageName := packagePaths[len(packagePaths)-1]
 	packagePaths = packagePaths[:len(packagePaths)-1]
 	packageSource = strings.Join(packagePaths, "/")
-	SourceRepo = sourceRepo
 
 	// initialization
 	ns := vfs.NameSpace{}
@@ -50,7 +50,12 @@ func GoYAMLGeneration(packageSource string, ymlOutput string, packagePrefix stri
 	docPackage, types := ToDocfx(info, packageName, packagePrefix)
 
 	// create package YAML file
-	packagePath := ymlOutput + "/" + packagePrefix
+	var packagePath string
+	if packagePrefix == "" {
+		packagePath = ymlOutput
+	} else {
+		packagePath = ymlOutput + "/" + packagePrefix
+	}
 	os.Mkdir(packagePath, os.ModePerm)
 	yamlBytes, err := yaml.Marshal(docPackage)
 	if err != nil {
@@ -199,6 +204,7 @@ type DocsExample struct {
 
 type SourcePosition struct {
 	Repo string `json:"repo"`
+	Branch string `json:"branch"`
 	File string `json:"file"`
 	Line int    `json:"line"`
 }
@@ -243,7 +249,11 @@ func ToDocfx(info *godoc.PageInfo, packageName string, packagePrefix string) (*D
 	}
 	var types []DocsType
 	if info.PDoc != nil {
-		pkg.Uid = packagePrefix + "." + packageName
+		if packagePrefix == "" {
+			pkg.Uid = packageName
+		} else {
+			pkg.Uid = packagePrefix + "." + packageName
+		}
 		pkg.Name = packageName
 		pkg.ImportPath = info.PDoc.ImportPath
 		pkg.Summary = summary(info.PDoc.Doc)
@@ -291,7 +301,7 @@ func toDocsTypes(types []*doc.Type, info *godoc.PageInfo, parentUid string) ([]D
 			Vars:        toDocsValues(t.Vars, info),
 			Funcs:       toDocsFuncs(t.Funcs, info, uid),
 			Methods:     toDocsFuncs(t.Methods, info, uid),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Source:      SourcePosition{Repo: SourceRepo, Branch: SourceBranch, File: fs.Filename, Line: fs.Line},
 		}
 		uidArr[i] = uid
 	}
@@ -309,7 +319,7 @@ func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo, parentUid string) []Do
 			Summary:     summary(f.Doc),
 			Description: description(f.Doc),
 			Code:        nodeFunc(info, f.Decl),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Source:      SourcePosition{Repo: SourceRepo, Branch: SourceBranch, File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
@@ -325,7 +335,7 @@ func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
 			Summary:     summary(v.Doc),
 			Description: description(v.Doc),
 			Code:        nodeFunc(info, v.Decl),
-			Source:      SourcePosition{Repo: SourceRepo, File: fs.Filename, Line: fs.Line},
+			Source:      SourcePosition{Repo: SourceRepo, Branch: SourceBranch, File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
