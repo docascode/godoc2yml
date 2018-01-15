@@ -2,16 +2,18 @@ package goyaml
 
 import (
 	"bytes"
+	"fmt"
+	"go/ast"
 	"go/build"
 	"go/doc"
 	"go/printer"
+	"os"
+	pathpkg "path"
+	"path/filepath"
+
 	"golang.org/x/tools/godoc"
 	"golang.org/x/tools/godoc/vfs"
 	"gopkg.in/yaml.v2"
-	"path/filepath"
-	pathpkg "path"
-	"os"
-	"fmt"
 )
 
 //  GoYAMLGeneration Generate the YAML file for golang projects
@@ -55,7 +57,7 @@ func GoYAMLGeneration(packageSource string, packageName string, ymlOutput string
 
 // PrintPosition
 // some Sample codes to print the source code position, for constants & functions & methods
-func PrintPosition(info *godoc.PageInfo){
+func PrintPosition(info *godoc.PageInfo) {
 	// print position info for constant
 	fmt.Println("---Constant source info example--------------------")
 	if len(info.PDoc.Consts) > 0 {
@@ -94,7 +96,6 @@ func PrintPosition(info *godoc.PageInfo){
 	fmt.Println("-----------------------")
 }
 
-
 // paths determines the paths to use.
 //
 // If we are passed an operating system path like . or ./foo or /foo/bar or c:\mysrc,
@@ -131,8 +132,6 @@ func nodeFunc(info *godoc.PageInfo, node interface{}) string {
 	return buf.String()
 }
 
-
-
 type DocsPackage struct {
 	IsMain      bool                  `json:"ismain"`
 	Summary     string                `json:"summary"`
@@ -166,16 +165,16 @@ type DocsExample struct {
 }
 
 type SourcePosition struct {
-	File	string	`json:"file"`
-	Line	int		`json:"line"`
+	File string `json:"file"`
+	Line int    `json:"line"`
 }
 
 type DocsValue struct {
-	Names       []string `json:"names"`
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	Code        string   `json:"code"`
-	Source		SourcePosition	`json:"source"`
+	Name        string         `json:"name"`
+	Summary     string         `json:"summary"`
+	Description string         `json:"description"`
+	Code        string         `json:"code"`
+	Source      SourcePosition `json:"source"`
 }
 
 type DocsType struct {
@@ -184,19 +183,19 @@ type DocsType struct {
 	Description string `json:"description"`
 	Code        string `json:"code"`
 
-	Consts  []DocsValue `json:"consts"`
-	Vars    []DocsValue `json:"vars"`
-	Funcs   []DocsFunc  `json:"funcs"`
-	Methods []DocsFunc  `json:"methods"`
-	Source		SourcePosition	`json:"source"`
+	Consts  []DocsValue    `json:"consts"`
+	Vars    []DocsValue    `json:"vars"`
+	Funcs   []DocsFunc     `json:"funcs"`
+	Methods []DocsFunc     `json:"methods"`
+	Source  SourcePosition `json:"source"`
 }
 
 type DocsFunc struct {
-	Name        string `json:"name"`
-	Summary     string `json:"summary"`
-	Description string `json:"description"`
-	Code        string `json:"code"`
-	Source		SourcePosition	`json:"source"`
+	Name        string         `json:"name"`
+	Summary     string         `json:"summary"`
+	Description string         `json:"description"`
+	Code        string         `json:"code"`
+	Source      SourcePosition `json:"source"`
 }
 
 func ToDocfx(info *godoc.PageInfo) *DocsPackage {
@@ -250,7 +249,7 @@ func toDocsTypes(types []*doc.Type, info *godoc.PageInfo) []DocsType {
 			Vars:        toDocsValues(t.Vars, info),
 			Funcs:       toDocsFuncs(t.Funcs, info),
 			Methods:     toDocsFuncs(t.Methods, info),
-			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
+			Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
@@ -266,26 +265,50 @@ func toDocsFuncs(funcs []*doc.Func, info *godoc.PageInfo) []DocsFunc {
 			Summary:     summary(f.Doc),
 			Description: description(f.Doc),
 			Code:        nodeFunc(info, f.Decl),
-			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
+			Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
 		}
 	}
 	return arr
 }
 
 func toDocsValues(values []*doc.Value, info *godoc.PageInfo) []DocsValue {
-	arr := make([]DocsValue, len(values))
-	for i, v := range values {
-		position := v.Decl.Pos()
-		fs := info.FSet.Position(position)
-		arr[i] = DocsValue{
-			Names:       v.Names,
-			Summary:     summary(v.Doc),
-			Description: description(v.Doc),
-			Code:        nodeFunc(info, v.Decl),
-			Source:		SourcePosition{ File: fs.Filename, Line: fs.Line},
+	var arrs []DocsValue
+	for _, v := range values {
+		arr := make([]DocsValue, len(v.Names))
+		if len(v.Names) > 1 {
+			for j, name := range v.Names {
+				spec := v.Decl.Specs[j].(*ast.ValueSpec)
+				doc := spec.Doc.Text()
+
+				// Ignore the document of declaration to get the Code section
+				spec.Doc = nil
+
+				position := spec.Pos()
+				fs := info.FSet.Position(position)
+
+				arr[j] = DocsValue{
+					Name:        name,
+					Summary:     summary(doc),
+					Description: description(doc),
+					Code:        nodeFunc(info, spec),
+					Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
+				}
+			}
+		} else {
+			position := v.Decl.Pos()
+			fs := info.FSet.Position(position)
+			arr[0] = DocsValue{
+				Name:        v.Names[0],
+				Summary:     summary(v.Doc),
+				Description: description(v.Doc),
+				Code:        nodeFunc(info, v.Decl),
+				Source:      SourcePosition{File: fs.Filename, Line: fs.Line},
+			}
 		}
+
+		arrs = append(arrs, arr...)
 	}
-	return arr
+	return arrs
 }
 
 func toDocsExamples(examples []*doc.Example, info *godoc.PageInfo) []DocsExample {
